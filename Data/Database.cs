@@ -249,5 +249,90 @@ namespace RankingCalculator.Data
 
             db.InsertGame(compId, p1, p2, s1, s2);
         }
+
+        // Cleans duplicated games in the source database.
+        // For each competition_id: if every distinct game (by player1_id, player2_id, player1_sets, player2_sets)
+        // appears exactly twice, delete the duplicate rows keeping the row with the smallest id for each distinct game.
+        public void CleanDuplicateGames()
+        {
+            using var con = GetSource();
+            con.Open();
+
+            var getComps = con.CreateCommand();
+            getComps.CommandText = "SELECT DISTINCT competition_id FROM games";
+
+            var compIds = new List<int>();
+
+            using (var r = getComps.ExecuteReader())
+            {
+                while (r.Read())
+                {
+                    if (!r.IsDBNull(0))
+                        compIds.Add(r.GetInt32(0));
+                }
+            }
+
+            foreach (var compId in compIds)
+            {
+                var cmd = con.CreateCommand();
+                cmd.CommandText = @"SELECT id, player1_id, player2_id, player1_sets, player2_sets
+FROM games
+WHERE competition_id = $c";
+                cmd.Parameters.AddWithValue("$c", compId);
+
+                var groups = new Dictionary<string, List<int>>();
+
+                using (var r = cmd.ExecuteReader())
+                {
+                    while (r.Read())
+                    {
+                        var id = r.GetInt32(0);
+                        var p1 = r.IsDBNull(1) ? 0 : r.GetInt32(1);
+                        var p2 = r.IsDBNull(2) ? 0 : r.GetInt32(2);
+                        var s1 = r.IsDBNull(3) ? 0 : r.GetInt32(3);
+                        var s2 = r.IsDBNull(4) ? 0 : r.GetInt32(4);
+
+                        var key = $"{p1}:{p2}:{s1}:{s2}";
+                        if (!groups.TryGetValue(key, out var list))
+                        {
+                            list = new List<int>();
+                            groups[key] = list;
+                        }
+
+                        list.Add(id);
+                    }
+                }
+
+                if (groups.Count == 0)
+                    continue;
+
+                // Proceed only if every distinct game appears exactly twice
+                if (groups.Values.All(l => l.Count == 2))
+                {
+                    Console.WriteLine($"Cleaning duplicates for competition {compId}");
+
+                    using var tr = con.BeginTransaction();
+
+                    foreach (var kv in groups)
+                    {
+                        var ids = kv.Value.OrderBy(x => x).ToList();
+                        // keep the first (smallest id), delete others
+                        for (int i = 1; i < ids.Count; i++)
+                        {
+                            var del = con.CreateCommand();
+                            del.CommandText = "DELETE FROM games WHERE id = $id";
+                            del.Parameters.AddWithValue("$id", ids[i]);
+                            del.ExecuteNonQuery();
+                        }
+                    }
+
+                    tr.Commit();
+                }
+                else
+                {
+                    Console.WriteLine($"Skipping competition {compId}: not all games are duplicated exactly twice");
+                }
+            }
+        }
     }
 }

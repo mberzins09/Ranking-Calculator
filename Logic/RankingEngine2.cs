@@ -252,7 +252,7 @@ namespace RankingCalculator.Logic
 
                 rating[id] = new PRating
                 {
-                    Points = pts + 500,
+                    Points = pts - ((gender == "female") ? 300 : 0),
                     Competitions = 0,
                     GamesPlayed = 0,
                     Gender = gender,
@@ -378,7 +378,7 @@ namespace RankingCalculator.Logic
                 if (maxOpp < 1000)
                     return 1000;
 
-                return maxOpp + 1;
+                return maxOpp + 100;
             }
 
             int n = Math.Min(w, l);
@@ -405,15 +405,15 @@ namespace RankingCalculator.Logic
         {
             int baseRating = p.StartRating;
 
-            var wins = p.WinsVs.Where(x => x.comps >= 5).ToList();
-            var losses = p.LossVs.Where(x => x.comps >= 5).ToList();
+            var wins = p.WinsVs.Where(x => x.comps >= 1).ToList();
+            var losses = p.LossVs.Where(x => x.comps >= 1).ToList();
 
             if (wins.Count == 0 && losses.Count == 0)
                 return null;
 
             var bigWins =p.WinsVs.Where(x => x.rating - baseRating > 200).ToList();
 
-            var bigLoss =p.LossVs.Where(x => baseRating - x.rating > 300).ToList();
+            //var bigLoss =p.LossVs.Where(x => baseRating - x.rating > 300).ToList();
 
             if (bigWins.Count >= 2)
             {
@@ -425,10 +425,66 @@ namespace RankingCalculator.Logic
                 return (int)all.Average(x => x.rating);
             }
 
+            //if (bigLoss.Count >= 2)
+            //{
+            //    var normalWins = wins.Where(x => Math.Abs(x.rating - baseRating) <= 50).ToList();
+            //    var all = bigLoss.Concat(normalWins).ToList();
+
+            //    if (all.Count < 2)
+            //        return null;
+
+            //    return (int)all.Average(x => x.rating);
+            //}
+
+            return null;
+        }
+
+        public int? CheckCorrectionDown(PlayerResult p)
+        {
+            int baseRating = p.StartRating;
+
+            var losses = p.LossVs.Where(x => x.comps >= 1).ToList();
+
+            if (losses.Count == 0)
+                return null;
+
+            var bigLoss = losses
+                .Where(x => baseRating - x.rating > 200)
+                .ToList();
+
             if (bigLoss.Count >= 2)
             {
-                var normalWins = wins.Where(x => Math.Abs(x.rating - baseRating) <= 50).ToList();
+                var normalWins = p.WinsVs
+                    .Where(x => Math.Abs(x.rating - baseRating) <= 50)
+                    .ToList();
+
                 var all = bigLoss.Concat(normalWins).ToList();
+
+                if (all.Count < 2)
+                    return null;
+
+                return (int)all.Average(x => x.rating);
+            }
+
+            return null;
+        }
+
+        public int? CheckCorrectionUp(PlayerResult p)
+        {
+            int baseRating = p.StartRating;
+
+            var wins = p.WinsVs.Where(x => x.comps >= 1).ToList();
+
+            if (wins.Count == 0)
+                return null;
+
+            var bigWins = wins
+                .Where(x => x.rating - baseRating > 200)
+                .ToList();
+
+            if (bigWins.Count >= 2)
+            {
+                var all = bigWins.Concat(p.LossVs).ToList();
 
                 if (all.Count < 2)
                     return null;
@@ -472,11 +528,17 @@ namespace RankingCalculator.Logic
                         changed = true;
                     }
 
-                    var corr = CheckCorrection(p);
-
-                    if (corr.HasValue)
+                    var up = CheckCorrectionUp(p);
+                    if (up.HasValue)
                     {
-                        rating[p.PlayerId].Points = corr.Value;
+                        rating[p.PlayerId].Points = up.Value;
+                        changed = true;
+                    }
+
+                    var down = CheckCorrectionDown(p);
+                    if (down.HasValue)
+                    {
+                        rating[p.PlayerId].Points = down.Value;
                         changed = true;
                     }
                 }

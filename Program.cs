@@ -8,7 +8,7 @@ using RankingCalculator.Logic;
 
 Database database = new Database();
 RankingEngine2 rankingEngine = new RankingEngine2(database);
-rankingEngine.Run("rankings12");
+rankingEngine.Run("rankings3");
 
 
 //EloCalculator elo = new EloCalculator();
@@ -30,7 +30,7 @@ rankingEngine.Run("rankings12");
 //Database database = new Database();
 //await database.ImportAll();
 
-
+//database.CleanDuplicateGames();
 
 //AddInitialPoints help = new AddInitialPoints();
 //await help.AddInitialPointsToSource();
