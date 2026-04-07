@@ -8,7 +8,7 @@ using RankingCalculator.Logic;
 
 Database database = new Database();
 RankingEngine2 rankingEngine = new RankingEngine2(database);
-rankingEngine.Run("rankings3");
+rankingEngine.Run("rankings9");
 
 
 //EloCalculator elo = new EloCalculator();
