@@ -18,7 +18,5 @@ namespace RankingCalculator.Models
         public DateTime? LastCompetitionDate { get; set; }
 
         public HashSet<DateTime> CompetitionDates = [];
-
-        public int LastPenaltyYear { get; set; } = 0;
     }
 }

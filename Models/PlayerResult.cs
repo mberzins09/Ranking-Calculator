@@ -11,5 +11,9 @@
         public int StartRating { get; set; }
 
         public string? Gender { get; set; }
+
+        public double? Coef { get; set; }
+
+        public int AfterInitial {  get; set; }
     }
 }
