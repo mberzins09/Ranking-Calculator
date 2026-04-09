@@ -108,17 +108,20 @@ namespace RankingCalculator.Logic
                 int c1 = rating[p1].Competitions;
                 int c2 = rating[p2].Competitions;
 
+                if (g1 == null) coef1 *= 2.5;
+                if (g2 == null) coef2 *= 2.5; 
+
                 if (c1 <= 10) coef1 *= 1.5;
                 if (c2 <= 10) coef2 *= 1.5;
 
                 if (c1 > 10 && c1 < 30) coef1 *= 1.2;
                 if (c2 > 10 && c2 < 30) coef2 *= 1.2;
 
-                coef1 = Math.Min(coef1, 10);
-                coef2 = Math.Min(coef2, 10);
+                coef1 = Math.Min(coef1, 16);
+                coef2 = Math.Min(coef2, 16);
 
-                rating[p1].Points = Math.Max(200, elo.NewRating(r1, score1, e1, coef1));
-                rating[p2].Points = Math.Max(200, elo.NewRating(r2, score2, e2, coef2));
+                rating[p1].Points = Math.Max(100, elo.NewRating(r1, score1, e1, coef1));
+                rating[p2].Points = Math.Max(100, elo.NewRating(r2, score2, e2, coef2));
 
                 rating[p1].CompetitionDates.Add(comp.StartDate);
                 rating[p2].CompetitionDates.Add(comp.StartDate);
@@ -227,11 +230,11 @@ namespace RankingCalculator.Logic
                 {
                     if (pts > 2000)
                     {
-                        femalePoints = pts - 400;
+                        femalePoints = pts - 350;
                     }
                     else if (pts > 1500)
                     {
-                        femalePoints = pts - 200;
+                        femalePoints = pts - 150;
                     }
                     else
                     {
@@ -367,11 +370,16 @@ namespace RankingCalculator.Logic
                 if (minOpp > 1000)
                 {
                     p.AfterInitial = 1000;
-                    return p.AfterInitial = 1000;
-                    ;
+                    return p.AfterInitial;
                 }
 
-                p.AfterInitial = minOpp - 1;
+                if (minOpp < 800)
+                {
+                    p.AfterInitial = 800;
+                    return p.AfterInitial;
+                }
+
+                p.AfterInitial = minOpp - 20;
                 return p.AfterInitial;
             }
 
@@ -397,29 +405,104 @@ namespace RankingCalculator.Logic
                 {
                     if (p.Gender == null)
                     {
-                        p.AfterInitial = maxOpp + 400;
+                        p.AfterInitial = maxOpp + 200;
                         return p.AfterInitial;
                     }
 
-                    p.AfterInitial = maxOpp + 200;
+                    p.AfterInitial = maxOpp + 50;
                     return p.AfterInitial;
                 }
 
                 if (p.Gender == null)
                 {
-                    p.AfterInitial = maxOpp + 300;
+                    p.AfterInitial = maxOpp + 50;
                     return p.AfterInitial;
                 }
 
-                p.AfterInitial = maxOpp + 100;
+                p.AfterInitial = maxOpp + 40;
                 return p.AfterInitial;
             }
 
             int n = Math.Min(w, l);
 
-            var wins = p.WinsVs.OrderByDescending(x => rating[x.opponentId].Points).Take(n);
-            var losses = p.LossVs.OrderBy(x => rating[x.opponentId].Points).Take(n);
-            var all = wins.Concat(losses);
+            var winsAll = p.WinsVs.OrderByDescending(x => rating[x.opponentId].Points).ToList();
+            var lossesAll = p.LossVs.OrderBy(x => rating[x.opponentId].Points).ToList();
+
+            if (n == 1)
+            {
+                if (winsAll.Count >= 2 && lossesAll.Count >= 1)
+                {
+                    int topWin = rating[winsAll[0].opponentId].Points;
+                    int worstLoss = rating[lossesAll[0].opponentId].Points;
+
+                    double avgWins = winsAll.Take(3).Select(x => rating[x.opponentId].Points).Average();
+                    double avgLosses = lossesAll.Take(3).Select(x => rating[x.opponentId].Points).Average();
+
+                    if (worstLoss - avgWins > 400)
+                    {
+                        int adjusted = (int)avgWins + 100;
+                        p.AfterInitial = adjusted;
+                        return p.AfterInitial;
+                    }
+
+                    if (topWin - avgLosses > 400)
+                    {
+                        int adjusted = (int)avgLosses - 100;
+                        p.AfterInitial = adjusted;
+                        return p.AfterInitial;
+                    }
+                }
+
+                if (winsAll.Count >= 3)
+                {
+                    int topWin = rating[winsAll[0].opponentId].Points;
+
+                    var otherWins = winsAll.Skip(1).Take(3).Select(x => rating[x.opponentId].Points).ToList();
+
+                    double avgOthers = otherWins.Average();
+
+                    if (topWin - avgOthers > 300)
+                    {
+                        int adjusted = (int)avgOthers + 200;
+
+                        p.AfterInitial = adjusted;
+                        return p.AfterInitial;
+                    }
+                }
+
+                if (lossesAll.Count >= 3)
+                {
+                    int worstLoss = rating[lossesAll[0].opponentId].Points;
+
+                    var otherLosses = lossesAll.Skip(1).Take(3).Select(x => rating[x.opponentId].Points).ToList();
+
+                    double avgOthers = otherLosses.Average();
+
+                    if (avgOthers - worstLoss > 300)
+                    {
+                        int adjusted = (int)avgOthers - 200;
+
+                        p.AfterInitial = adjusted;
+                        return p.AfterInitial;
+                    }
+                }
+            }
+
+            var wins = winsAll.Take(n).ToList();
+            var losses = lossesAll.Take(n).ToList();
+
+            if (n >= 2)
+            {
+                wins.RemoveAt(0); // strongest win
+                losses.RemoveAt(losses.Count - 1); // weakest loss
+            }
+
+            var all = wins.Concat(losses).ToList();
+
+            if (all.Count == 0)
+            {
+                all = winsAll.Take(2).Concat(lossesAll.Take(2)).ToList();
+            }
 
             double sum = 0;
             double weightSum = 0;
@@ -435,28 +518,42 @@ namespace RankingCalculator.Logic
                 weightSum += weight;
             }
 
+            int avg = (int)(sum / weightSum);
+
+            int strongestWin = winsAll.Count > 0 ? rating[winsAll[0].opponentId].Points : avg;
+            int weakestLoss = lossesAll.Count > 0 ? rating[lossesAll[0].opponentId].Points : avg;
+
+            if (strongestWin - avg > 400)
+            {
+                avg = (int)(avg * 0.7 + strongestWin * 0.3);
+            }
+
+            if (avg - weakestLoss > 400)
+            {
+                avg = (int)(avg * 0.7 + weakestLoss * 0.3);
+            }
+
             bigComp = p.Coef >= 2;
-            var weightSumReturn = (int)(sum / weightSum);
 
             if (bigComp)
             {
                 if (p.Gender == null)
                 {
-                    p.AfterInitial = 400 + weightSumReturn;
+                    p.AfterInitial = 50 + avg;
                     return p.AfterInitial;
                 }
 
-                p.AfterInitial = 50 + weightSumReturn;
+                p.AfterInitial = 10 + avg;
                 return p.AfterInitial;
             }
 
             if (p.Gender == null)
             {
-                p.AfterInitial = 300 + weightSumReturn;
+                p.AfterInitial = 20 + avg;
                 return p.AfterInitial;
             }
 
-            p.AfterInitial = 20 + weightSumReturn;
+            p.AfterInitial = 10 + avg;
             return p.AfterInitial;
         }
 
@@ -476,7 +573,7 @@ namespace RankingCalculator.Logic
                 return null;
 
             var bigWins = wins.Where(x => rating[x.opponentId].Points - baseRating >= 400).ToList();
-            var superWins = wins.Where(x => rating[x.opponentId].Points - baseRating >= 600).ToList();
+            var superWins = wins.Where(x => rating[x.opponentId].Points - baseRating >= 700).ToList();
             bool isSuperWin = superWins.Count > 1;
             var countedLosses = losses.Where(x => Math.Abs(rating[x.opponentId].Points - baseRating) <= 200);
 
@@ -493,7 +590,7 @@ namespace RankingCalculator.Logic
                     return null;
 
                 if (avarageRating - baseRating > 400)
-                    return baseRating + 400;
+                    return baseRating + 300;
 
                 return avarageRating;
             }
@@ -532,94 +629,127 @@ namespace RankingCalculator.Logic
             return null;
         }
 
+        //public void CalculateCompetitionAdvanced(Competition comp, Dictionary<int, PRating> rating)
+        //{
+        //    var results = GetCompetitionResults(comp, rating);
+
+        //    var snapshot = rating.ToDictionary(x => x.Key, x => x.Value.Points);
+        //    var corrected = new Dictionary<int, int>();
+
+        //    foreach (var p in results.Values)
+        //    {
+        //        int newRating = snapshot[p.PlayerId];
+
+        //        if (!rating.ContainsKey(p.PlayerId) || rating[p.PlayerId].Competitions == 0)
+        //        {
+        //            newRating = CalculateInitialFromResults(p, rating);
+        //        }
+
+        //        var up = CheckCorrectionUp(p, rating);
+        //        if (up.HasValue)
+        //            newRating = up.Value;
+
+        //        var down = CheckCorrectionDown(p, rating);
+        //        if (down.HasValue)
+        //            newRating = down.Value;
+
+        //        corrected[p.PlayerId] = newRating;
+        //    }
+
+        //    foreach (var kv in corrected)
+        //    {
+        //        rating[kv.Key].Points = kv.Value;
+        //    }
+
+        //    CalculateCompetition(comp, rating);
+
+        //    foreach (var p in results.Keys)
+        //    {
+        //        rating[p].Competitions++;
+        //    }
+        //}
+
         public void CalculateCompetitionAdvanced(Competition comp, Dictionary<int, PRating> rating)
         {
-            //var results = GetCompetitionResults(comp, rating);
-
-            //for (int iter = 0; iter < 2; iter++)
-            //{
-            //    bool changed = false;
-
-            //    foreach (var p in results.Values)
-            //    {
-            //        if (!rating.ContainsKey(p.PlayerId) || rating[p.PlayerId].Competitions == 0)
-            //        {
-            //            int newRating = CalculateInitialFromResults(p, rating);
-            //            int gamesCount = p.WinsVs.Count() + p.LossVs.Count();
-            //            if (!rating.ContainsKey(p.PlayerId))
-            //            {
-            //                rating[p.PlayerId] = new PRating
-            //                {
-            //                    Points = newRating,
-            //                    GamesPlayed = gamesCount,
-            //                    Competitions = 0,
-            //                    GamesVsFemale = p.WinsVs.Count(x => x.gender == "female") + p.LossVs.Count(x => x.gender == "female"),
-            //                    GamesVsMale = p.WinsVs.Count(x => x.gender == "male") + p.LossVs.Count(x => x.gender == "male")
-            //                };
-            //            }
-            //            else
-            //            {
-            //                rating[p.PlayerId].Points = newRating;
-            //                rating[p.PlayerId].GamesPlayed = gamesCount;
-            //            }
-
-            //            changed = true;
-            //        }
-
-            //        var up = CheckCorrectionUp(p, rating);
-            //        if (up.HasValue)
-            //        {
-            //            rating[p.PlayerId].Points = up.Value;
-            //            changed = true;
-            //        }
-
-            //        var down = CheckCorrectionDown(p, rating);
-            //        if (down.HasValue)
-            //        {
-            //            rating[p.PlayerId].Points = down.Value;
-            //            changed = true;
-            //        }
-            //    }
-
-            //    CalculateCompetition(comp, rating);
-
-            //    if (!changed)
-            //        break;
-            //}
-
-            //foreach (var p in results.Keys)
-            //{
-            //    rating[p].Competitions++;
-            //}
-
             var results = GetCompetitionResults(comp, rating);
 
-            var snapshot = rating.ToDictionary(x => x.Key, x => x.Value.Points);
-            var corrected = new Dictionary<int, int>();
+            var tempRatings = rating.ToDictionary(x => x.Key, x => x.Value.Points);
 
-            foreach (var p in results.Values)
+            const int MAX_ITER = 3;
+
+            for (int iter = 0; iter < MAX_ITER; iter++)
             {
-                int newRating = snapshot[p.PlayerId];
+                bool changed = false;
 
-                if (!rating.ContainsKey(p.PlayerId) || rating[p.PlayerId].Competitions == 0)
+                foreach (var kv in tempRatings)
                 {
-                    newRating = CalculateInitialFromResults(p, rating);
+                    if (rating.ContainsKey(kv.Key))
+                        rating[kv.Key].Points = kv.Value;
                 }
 
-                var up = CheckCorrectionUp(p, rating);
-                if (up.HasValue)
-                    newRating = up.Value;
+                foreach (var p in results.Values)
+                {
+                    int oldRating = tempRatings[p.PlayerId];
+                    int newRating = oldRating;
 
-                var down = CheckCorrectionDown(p, rating);
-                if (down.HasValue)
-                    newRating = down.Value;
+                    bool needsInitial = !rating.ContainsKey(p.PlayerId) || rating[p.PlayerId].Competitions == 0;
 
-                corrected[p.PlayerId] = newRating;
+                    bool foreignUnstable = rating.ContainsKey(p.PlayerId) && rating[p.PlayerId].Gender == null && rating[p.PlayerId].Competitions < 2;
+
+                    if (needsInitial || foreignUnstable)
+                    {
+                        int candidate = CalculateInitialFromResults(p, rating);
+
+                        if (!rating.ContainsKey(p.PlayerId) || Math.Abs(candidate - oldRating) > 100 || rating[p.PlayerId].Gender == null)
+                        {
+                            if (foreignUnstable)
+                            {
+                                if (oldRating - candidate > 50)
+                                {
+                                    newRating = oldRating;
+                                }
+                            }
+
+                            newRating = candidate;
+                        }
+                    }
+
+                    var up = CheckCorrectionUp(p, rating);
+                    if (up.HasValue)
+                        newRating = up.Value;
+
+                    var down = CheckCorrectionDown(p, rating);
+                    if (down.HasValue)
+                        newRating = down.Value;
+
+                    if (Math.Abs(newRating - oldRating) > 5)
+                    {
+                        tempRatings[p.PlayerId] = newRating;
+                        changed = true;
+                    }
+                }
+
+                if (!changed)
+                    break;
             }
 
-            foreach (var kv in corrected)
+            foreach (var kv in tempRatings)
             {
-                rating[kv.Key].Points = kv.Value;
+                if (!rating.ContainsKey(kv.Key))
+                {
+                    rating[kv.Key] = new PRating
+                    {
+                        Points = kv.Value,
+                        Competitions = 0,
+                        GamesPlayed = 0,
+                        GamesVsFemale = 0,
+                        GamesVsMale = 0
+                    };
+                }
+                else
+                {
+                    rating[kv.Key].Points = kv.Value;
+                }
             }
 
             CalculateCompetition(comp, rating);
