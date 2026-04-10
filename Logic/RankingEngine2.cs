@@ -120,8 +120,8 @@ namespace RankingCalculator.Logic
                 coef1 = Math.Min(coef1, 16);
                 coef2 = Math.Min(coef2, 16);
 
-                rating[p1].Points = Math.Max(100, elo.NewRating(r1, score1, e1, coef1));
-                rating[p2].Points = Math.Max(100, elo.NewRating(r2, score2, e2, coef2));
+                rating[p1].Points = Math.Max(200, elo.NewRating(r1, score1, e1, coef1));
+                rating[p2].Points = Math.Max(200, elo.NewRating(r2, score2, e2, coef2));
 
                 rating[p1].CompetitionDates.Add(comp.StartDate);
                 rating[p2].CompetitionDates.Add(comp.StartDate);
@@ -373,9 +373,9 @@ namespace RankingCalculator.Logic
                     return p.AfterInitial;
                 }
 
-                if (minOpp < 800)
+                if (minOpp < 750)
                 {
-                    p.AfterInitial = 800;
+                    p.AfterInitial = 750;
                     return p.AfterInitial;
                 }
 
@@ -419,7 +419,7 @@ namespace RankingCalculator.Logic
                     return p.AfterInitial;
                 }
 
-                p.AfterInitial = maxOpp + 40;
+                p.AfterInitial = maxOpp + 20;
                 return p.AfterInitial;
             }
 
@@ -441,6 +441,9 @@ namespace RankingCalculator.Logic
                     if (worstLoss - avgWins > 400)
                     {
                         int adjusted = (int)avgWins + 100;
+                        if (adjusted < 750)
+                            adjusted = 750;
+
                         p.AfterInitial = adjusted;
                         return p.AfterInitial;
                     }
@@ -448,6 +451,9 @@ namespace RankingCalculator.Logic
                     if (topWin - avgLosses > 400)
                     {
                         int adjusted = (int)avgLosses - 100;
+                        if (adjusted < 750)
+                            adjusted = 750;
+
                         p.AfterInitial = adjusted;
                         return p.AfterInitial;
                     }
@@ -464,6 +470,8 @@ namespace RankingCalculator.Logic
                     if (topWin - avgOthers > 300)
                     {
                         int adjusted = (int)avgOthers + 200;
+                        if (adjusted < 750)
+                            adjusted = 750;
 
                         p.AfterInitial = adjusted;
                         return p.AfterInitial;
@@ -481,6 +489,8 @@ namespace RankingCalculator.Logic
                     if (avgOthers - worstLoss > 300)
                     {
                         int adjusted = (int)avgOthers - 200;
+                        if (adjusted < 750)
+                            adjusted = 750;
 
                         p.AfterInitial = adjusted;
                         return p.AfterInitial;
@@ -540,20 +550,32 @@ namespace RankingCalculator.Logic
                 if (p.Gender == null)
                 {
                     p.AfterInitial = 50 + avg;
+                    if (p.AfterInitial < 750)
+                        p.AfterInitial = 750;
+
                     return p.AfterInitial;
                 }
 
                 p.AfterInitial = 10 + avg;
+                if (p.AfterInitial < 750)
+                    p.AfterInitial = 750;
+
                 return p.AfterInitial;
             }
 
             if (p.Gender == null)
             {
                 p.AfterInitial = 20 + avg;
+                if (p.AfterInitial < 750)
+                    p.AfterInitial = 750;
+
                 return p.AfterInitial;
             }
 
             p.AfterInitial = 10 + avg;
+            if (p.AfterInitial < 750)
+                p.AfterInitial = 750;
+
             return p.AfterInitial;
         }
 
@@ -623,7 +645,11 @@ namespace RankingCalculator.Logic
                 if (all.Count < 4)
                     return null;
 
-                return (int)all.Average(x => rating[x.opponentId].Points);
+                int avg = (int)all.Average(x => rating[x.opponentId].Points);
+                if (avg < 400)
+                    avg = 400;
+
+                return avg;
             }
 
             return null;

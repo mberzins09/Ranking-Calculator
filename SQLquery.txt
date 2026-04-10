@@ -1,0 +1,34 @@
+SELECT
+    p.Name,
+    p.Surname,
+    r.points
+FROM players p
+JOIN rankings1 r ON r.player_id = p.id
+WHERE r.month = '2026-03'
+ORDER BY r.points DESC;
+
+
+SELECT
+    c.name AS competition_name,
+    c.coef,
+    c.start_date,
+
+    opp.Name AS opponent_name,
+    opp.Surname AS opponent_surname,
+
+    g.player1_sets,
+    g.player2_sets,
+
+    CASE WHEN g.player1_id = 4302 THEN TRUE ELSE FALSE END AS is_player1
+FROM games g
+JOIN competitions c ON c.id = g.competition_id
+
+-- opponent player
+JOIN players opp 
+    ON opp.id = CASE 
+                    WHEN g.player1_id = 4302 THEN g.player2_id
+                    ELSE g.player1_id
+                END
+
+WHERE 4302 IN (g.player1_id, g.player2_id)
+ORDER BY c.start_date DESC;
